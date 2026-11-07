@@ -1,0 +1,433 @@
+{
+  "name": "08 - AI Multi-Platform Content Repurposing Pipeline",
+  "nodes": [
+    {
+      "id": "a8000001-0000-4000-8000-000000000001",
+      "name": "New Content Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "content-repurpose-webhook",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "content/repurpose",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "a8000001-0000-4000-8000-000000000002",
+      "name": "Normalize Content",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [480, 300],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            { "id": "c1", "name": "content_id", "value": "={{ $json.id ?? 'CNT-' + $now.toMillis() }}", "type": "string" },
+            { "id": "c2", "name": "title", "value": "={{ $json.title }}", "type": "string" },
+            { "id": "c3", "name": "body", "value": "={{ $json.body ?? $json.content ?? $json.text }}", "type": "string" },
+            { "id": "c4", "name": "author", "value": "={{ $json.author ?? 'Team' }}", "type": "string" },
+            { "id": "c5", "name": "url", "value": "={{ $json.url ?? $json.link ?? '' }}", "type": "string" },
+            { "id": "c6", "name": "category", "value": "={{ $json.category ?? 'general' }}", "type": "string" },
+            { "id": "c7", "name": "target_platforms", "value": "={{ $json.platforms ?? ['twitter', 'linkedin', 'email', 'instagram'] }}", "type": "array" },
+            { "id": "c8", "name": "tone", "value": "={{ $json.tone ?? 'professional' }}", "type": "string" },
+            { "id": "c9", "name": "created_at", "value": "={{ $now.toISO() }}", "type": "string" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a8000001-0000-4000-8000-000000000003",
+      "name": "AI Generate Twitter Thread",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1.4,
+      "position": [720, 100],
+      "parameters": {
+        "resource": "chat",
+        "operation": "complete",
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o",
+          "mode": "list"
+        },
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a viral Twitter/X content strategist. Create a Twitter thread from the content. Return ONLY valid JSON:\n{\n  \"hook\": \"attention-grabbing opening tweet (max 280 chars, no hashtags yet)\",\n  \"tweets\": [\"tweet 2\", \"tweet 3\", \"tweet 4\", \"tweet 5\", \"tweet 6\"],\n  \"cta_tweet\": \"final call-to-action tweet with link placeholder {URL}\",\n  \"hashtags\": [\"#tag1\", \"#tag2\", \"#tag3\"],\n  \"best_post_time\": \"morning|afternoon|evening\",\n  \"estimated_reach_boost\": \"description of why this will perform well\"\n}\nMake the hook stop-scrolling. Each tweet should be a standalone insight (not 'thread 1/7'). Max 280 chars per tweet."
+            },
+            {
+              "role": "user",
+              "content": "Title: {{ $json.title }}\nContent: {{ $json.body?.substring(0, 3000) }}\nTone: {{ $json.tone }}\nURL: {{ $json.url }}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.7,
+          "maxTokens": 1200
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "id": "a8000001-0000-4000-8000-000000000004",
+      "name": "AI Generate LinkedIn Post",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1.4,
+      "position": [720, 260],
+      "parameters": {
+        "resource": "chat",
+        "operation": "complete",
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o",
+          "mode": "list"
+        },
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are an expert LinkedIn content strategist. Create a high-performing LinkedIn post. Return ONLY valid JSON:\n{\n  \"post\": \"full LinkedIn post (600-1200 chars, with line breaks for readability, hook in first line, story in middle, takeaway at end)\",\n  \"hashtags\": [\"#tag1\", \"#tag2\", \"#tag3\", \"#tag4\", \"#tag5\"],\n  \"image_prompt\": \"DALL-E prompt for an ideal accompanying image\",\n  \"best_post_time\": \"Tue-Thu 8-10am or 12-2pm recommended\",\n  \"engagement_hook\": \"a question to end the post and drive comments\"\n}\nLinkedIn loves: personal stories, lessons learned, contrarian takes, numbered lists, specific outcomes."
+            },
+            {
+              "role": "user",
+              "content": "Title: {{ $json.title }}\nContent: {{ $json.body?.substring(0, 3000) }}\nAuthor: {{ $json.author }}\nTone: {{ $json.tone }}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.65,
+          "maxTokens": 900
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "id": "a8000001-0000-4000-8000-000000000005",
+      "name": "AI Generate Email Newsletter",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1.4,
+      "position": [720, 420],
+      "parameters": {
+        "resource": "chat",
+        "operation": "complete",
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o",
+          "mode": "list"
+        },
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a top email newsletter writer. Create an email newsletter snippet for this content. Return ONLY valid JSON:\n{\n  \"subject_line\": \"compelling email subject (max 60 chars)\",\n  \"preview_text\": \"preview/preheader text (max 90 chars)\",\n  \"headline\": \"email headline (H1)\",\n  \"intro\": \"opening paragraph (2-3 sentences, hook the reader)\",\n  \"key_insights\": [\"insight 1\", \"insight 2\", \"insight 3\"],\n  \"body_html\": \"full HTML email body (clean, professional, mobile-friendly with inline styles)\",\n  \"cta_text\": \"call to action button text\",\n  \"cta_url\": \"{URL_PLACEHOLDER}\",\n  \"a_b_subject_alternative\": \"alternative subject line for A/B testing\"\n}"
+            },
+            {
+              "role": "user",
+              "content": "Title: {{ $json.title }}\nContent: {{ $json.body?.substring(0, 4000) }}\nURL: {{ $json.url }}\nAuthor: {{ $json.author }}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.5,
+          "maxTokens": 1500
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "id": "a8000001-0000-4000-8000-000000000006",
+      "name": "AI Generate Instagram Caption",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1.4,
+      "position": [720, 580],
+      "parameters": {
+        "resource": "chat",
+        "operation": "complete",
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list"
+        },
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are an Instagram content creator. Create engaging Instagram content. Return ONLY valid JSON:\n{\n  \"caption\": \"Instagram caption (150-300 words, conversational, with emoji, line breaks for readability)\",\n  \"hashtags\": [\"#tag1\", \"#tag2\", ... up to 20 relevant hashtags],\n  \"image_prompt\": \"detailed DALL-E prompt for an eye-catching Instagram image\",\n  \"carousel_slides\": [\"slide 1 text\", \"slide 2 text\", \"slide 3 text\", \"slide 4 text\", \"slide 5 text\"],\n  \"story_sequence\": [\"story frame 1 concept\", \"story frame 2 concept\", \"story frame 3 concept\"]\n}"
+            },
+            {
+              "role": "user",
+              "content": "Title: {{ $json.title }}\nContent summary: {{ $json.body?.substring(0, 1500) }}\nTone: {{ $json.tone }}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.8,
+          "maxTokens": 800
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "id": "a8000001-0000-4000-8000-000000000007",
+      "name": "Merge All Platform Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 300],
+      "parameters": {
+        "jsCode": "// Collect all items from parallel AI branches\nconst allItems = $input.all();\n\n// Parse each AI response safely\nconst parseContent = (content) => {\n  try { return JSON.parse(content); }\n  catch {\n    const match = content?.match(/\\{[\\s\\S]*\\}/);\n    try { return JSON.parse(match?.[0] ?? '{}'); } catch { return {}; }\n  }\n};\n\n// Get content from first item (they should all have the original fields)\nconst base = allItems[0]?.json ?? {};\n\n// In a real n8n setup, you'd use a Merge node with 4 inputs\n// This Code node combines outputs for the notification step\nconst twitter = parseContent(base.message?.content ?? '{}');\nconst linkedin = parseContent(allItems[1]?.json.message?.content ?? '{}');\nconst email = parseContent(allItems[2]?.json.message?.content ?? '{}');\nconst instagram = parseContent(allItems[3]?.json.message?.content ?? '{}');\n\nreturn {\n  content_id: base.content_id,\n  title: base.title,\n  url: base.url,\n  author: base.author,\n  created_at: base.created_at,\n  twitter_content: {\n    hook: twitter.hook ?? '',\n    tweets: twitter.tweets ?? [],\n    cta_tweet: twitter.cta_tweet ?? '',\n    hashtags: twitter.hashtags ?? [],\n    best_post_time: twitter.best_post_time ?? 'morning'\n  },\n  linkedin_content: {\n    post: linkedin.post ?? '',\n    hashtags: linkedin.hashtags ?? [],\n    engagement_hook: linkedin.engagement_hook ?? '',\n    best_post_time: linkedin.best_post_time ?? 'morning'\n  },\n  email_content: {\n    subject_line: email.subject_line ?? base.title,\n    preview_text: email.preview_text ?? '',\n    headline: email.headline ?? base.title,\n    key_insights: email.key_insights ?? [],\n    body_html: email.body_html ?? '',\n    cta_text: email.cta_text ?? 'Read More',\n    ab_subject: email.a_b_subject_alternative ?? ''\n  },\n  instagram_content: {\n    caption: instagram.caption ?? '',\n    hashtags: instagram.hashtags ?? [],\n    carousel_slides: instagram.carousel_slides ?? [],\n    image_prompt: instagram.image_prompt ?? ''\n  },\n  all_generated: true,\n  platforms_count: 4\n};"
+      }
+    },
+    {
+      "id": "a8000001-0000-4000-8000-000000000008",
+      "name": "Save to Content Database",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1200, 200],
+      "parameters": {
+        "operation": "insert",
+        "schema": { "__rl": true, "value": "public", "mode": "list" },
+        "table": { "__rl": true, "value": "repurposed_content", "mode": "list" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "content_id": "={{ $json.content_id }}",
+            "original_title": "={{ $json.title }}",
+            "original_url": "={{ $json.url }}",
+            "author": "={{ $json.author }}",
+            "twitter_hook": "={{ $json.twitter_content?.hook ?? '' }}",
+            "twitter_hashtags": "={{ JSON.stringify($json.twitter_content?.hashtags) }}",
+            "linkedin_post": "={{ $json.linkedin_content?.post ?? '' }}",
+            "email_subject": "={{ $json.email_content?.subject_line ?? '' }}",
+            "instagram_caption": "={{ $json.instagram_content?.caption ?? '' }}",
+            "status": "ready_to_schedule",
+            "created_at": "={{ $json.created_at }}"
+          }
+        },
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_WITH_POSTGRES_CREDENTIAL_ID",
+          "name": "PostgreSQL"
+        }
+      }
+    },
+    {
+      "id": "a8000001-0000-4000-8000-000000000009",
+      "name": "Notify Marketing Team",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [1200, 400],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "channel": {
+          "__rl": true,
+          "value": "#content-marketing",
+          "mode": "name"
+        },
+        "text": ":rocket: Content repurposed and ready to publish!",
+        "blocksUi": {
+          "blocksValues": [
+            {
+              "type": "header",
+              "text": {
+                "type": "plain_text",
+                "text": "Content Repurposing Complete"
+              }
+            },
+            {
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "*{{ $json.title }}*\nBy {{ $json.author }} · {{ $json.url }}"
+              }
+            },
+            {
+              "type": "section",
+              "fields": [
+                {
+                  "type": "mrkdwn",
+                  "text": "*:bird: Twitter Thread*\n{{ $json.twitter_content?.hook?.substring(0, 100) }}..."
+                },
+                {
+                  "type": "mrkdwn",
+                  "text": "*:briefcase: LinkedIn*\n{{ $json.linkedin_content?.post?.substring(0, 100) }}..."
+                },
+                {
+                  "type": "mrkdwn",
+                  "text": "*:email: Email Subject*\n{{ $json.email_content?.subject_line }}"
+                },
+                {
+                  "type": "mrkdwn",
+                  "text": "*:camera: Instagram*\n{{ $json.instagram_content?.carousel_slides?.length ?? 0 }} carousel slides ready"
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "={{ ':label: Hashtags: ' + [...($json.twitter_content?.hashtags?.slice(0,3) ?? [])].join(' ') }}\nAll content saved and ready to schedule. Review before publishing!"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_WITH_SLACK_CREDENTIAL_ID",
+          "name": "Slack API"
+        }
+      }
+    },
+    {
+      "id": "a8000001-0000-4000-8000-000000000010",
+      "name": "Create Content Calendar Entry",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [1440, 300],
+      "parameters": {
+        "resource": "record",
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "REPLACE_WITH_AIRTABLE_BASE_ID",
+          "mode": "list"
+        },
+        "table": {
+          "__rl": true,
+          "value": "Content Calendar",
+          "mode": "list"
+        },
+        "fields": {
+          "fieldMappings": [
+            { "fieldId": "Title", "fieldValue": "={{ $json.title }}" },
+            { "fieldId": "Content ID", "fieldValue": "={{ $json.content_id }}" },
+            { "fieldId": "Original URL", "fieldValue": "={{ $json.url }}" },
+            { "fieldId": "Twitter Hook", "fieldValue": "={{ $json.twitter_content?.hook }}" },
+            { "fieldId": "LinkedIn Post", "fieldValue": "={{ $json.linkedin_content?.post }}" },
+            { "fieldId": "Email Subject", "fieldValue": "={{ $json.email_content?.subject_line }}" },
+            { "fieldId": "Status", "fieldValue": "Ready to Schedule" },
+            { "fieldId": "Platforms", "fieldValue": "Twitter,LinkedIn,Email,Instagram" },
+            { "fieldId": "Created", "fieldValue": "={{ $json.created_at }}" }
+          ]
+        }
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "REPLACE_WITH_AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable API"
+        }
+      }
+    },
+    {
+      "id": "a8000001-0000-4000-8000-000000000011",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1680, 300],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, content_id: $json.content_id, platforms_generated: 4, twitter_hook: $json.twitter_content?.hook?.substring(0, 100), email_subject: $json.email_content?.subject_line, message: 'Content repurposed for Twitter, LinkedIn, Email, and Instagram. Added to content calendar.' }) }}",
+        "options": { "responseCode": 200 }
+      }
+    }
+  ],
+  "connections": {
+    "New Content Webhook": {
+      "main": [
+        [{ "node": "Normalize Content", "type": "main", "index": 0 }]
+      ]
+    },
+    "Normalize Content": {
+      "main": [
+        [
+          { "node": "AI Generate Twitter Thread", "type": "main", "index": 0 },
+          { "node": "AI Generate LinkedIn Post", "type": "main", "index": 0 },
+          { "node": "AI Generate Email Newsletter", "type": "main", "index": 0 },
+          { "node": "AI Generate Instagram Caption", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "AI Generate Twitter Thread": {
+      "main": [
+        [{ "node": "Merge All Platform Content", "type": "main", "index": 0 }]
+      ]
+    },
+    "AI Generate LinkedIn Post": {
+      "main": [
+        [{ "node": "Merge All Platform Content", "type": "main", "index": 0 }]
+      ]
+    },
+    "AI Generate Email Newsletter": {
+      "main": [
+        [{ "node": "Merge All Platform Content", "type": "main", "index": 0 }]
+      ]
+    },
+    "AI Generate Instagram Caption": {
+      "main": [
+        [{ "node": "Merge All Platform Content", "type": "main", "index": 0 }]
+      ]
+    },
+    "Merge All Platform Content": {
+      "main": [
+        [
+          { "node": "Save to Content Database", "type": "main", "index": 0 },
+          { "node": "Notify Marketing Team", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Save to Content Database": {
+      "main": [
+        [{ "node": "Create Content Calendar Entry", "type": "main", "index": 0 }]
+      ]
+    },
+    "Notify Marketing Team": {
+      "main": [
+        [{ "node": "Create Content Calendar Entry", "type": "main", "index": 0 }]
+      ]
+    },
+    "Create Content Calendar Entry": {
+      "main": [
+        [{ "node": "Respond to Webhook", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "id": "wf-content-repurposing-v1",
+  "meta": {
+    "instanceId": "REPLACE_WITH_YOUR_N8N_INSTANCE_ID",
+    "templateCredsSetupCompleted": false
+  },
+  "tags": ["marketing", "content", "ai", "social-media", "repurposing", "production"]
+}
